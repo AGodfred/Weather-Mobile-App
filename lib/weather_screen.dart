@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:weather_app/additional_info_item.dart';
 import 'package:weather_app/hourly_forecast_item.dart';
 import 'package:http/http.dart' as http;
@@ -16,6 +17,7 @@ class WeatherScreen extends StatefulWidget {
 
 class _WeatherScreenState extends State<WeatherScreen> {
   // Global Variables
+  late Future<Map<String, dynamic>> weather = getCurrentWeather();
 
   Future<Map<String, dynamic>> getCurrentWeather() async {
     try {
@@ -40,6 +42,12 @@ class _WeatherScreenState extends State<WeatherScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    weather = getCurrentWeather();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -51,7 +59,9 @@ class _WeatherScreenState extends State<WeatherScreen> {
         actions: [
           IconButton(
             onPressed: () {
-              print('refesh');
+              setState(() {
+                weather = getCurrentWeather();
+              });
             },
             icon: Icon(Icons.refresh),
           ),
@@ -60,7 +70,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
 
       // Body
       body: FutureBuilder(
-        future: getCurrentWeather(),
+        future: weather,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(
@@ -148,36 +158,26 @@ class _WeatherScreenState extends State<WeatherScreen> {
                   textAlign: TextAlign.left,
                 ),
                 const SizedBox(height: 10),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      HourlyWeatherForecastItem(
-                        time: '00:00',
-                        icon: Icons.cloud,
-                        temperature: '301.17',
-                      ),
-                      HourlyWeatherForecastItem(
-                        time: '03:00',
-                        icon: Icons.sunny,
-                        temperature: '301.17',
-                      ),
-                      HourlyWeatherForecastItem(
-                        time: '06:00',
-                        icon: Icons.cloud,
-                        temperature: '301.17',
-                      ),
-                      HourlyWeatherForecastItem(
-                        time: '09:00',
-                        icon: Icons.foggy,
-                        temperature: '301.17',
-                      ),
-                      HourlyWeatherForecastItem(
-                        time: '12:00',
-                        icon: Icons.cloud,
-                        temperature: '301.17',
-                      ),
-                    ],
+
+                // Utilized lazy loading to load the hourly forecast items to save memory
+                SizedBox(
+                  height: 125,
+                  child: ListView.builder(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: 8,
+                    itemBuilder: (context, index) {
+                      final hourlyForecast = data['list'][index + 1];
+                      final hourlySky = hourlyForecast['weather'][0]['main'];
+                      final time = DateTime.parse(hourlyForecast['dt_txt']);
+                      return HourlyWeatherForecastItem(
+                        time: DateFormat.jm().format(time),
+                        icon:
+                            hourlySky == 'Clouds' || hourlySky == 'Rain'
+                                ? Icons.cloud
+                                : Icons.sunny,
+                        temperature: hourlyForecast['main']['temp'].toString(),
+                      );
+                    },
                   ),
                 ),
 
@@ -205,7 +205,7 @@ class _WeatherScreenState extends State<WeatherScreen> {
                     AdditionalInfoItem(
                       icon: Icons.beach_access,
                       text: 'Pressure',
-                      value: currentWeatherPressure.toString(),	
+                      value: currentWeatherPressure.toString(),
                     ),
                   ],
                 ),
